@@ -8,7 +8,7 @@ import { spojtConfig } from "@/resources/spojt.config";
 const MARQUEE_ITEMS = [
   "Never Miss a Show, Live, or JKT48 Update",
 ];
-const SEPARATOR = "    ·    ";
+const SEPARATOR = "   ·   ";
 // ────────────────────────────────────────────────────────────────────────────
 
 // 5×5 dot-matrix font — jauh lebih readable dari 5×3
@@ -16,8 +16,11 @@ const FONT: Record<string, string[]> = {
   " ": ["00000","00000","00000","00000","00000"],
   "·": ["00000","00000","00110","00110","00000"],
   ".": ["00000","00000","00000","00110","00110"],
+  ",": ["00000","00000","00000","00110","00100"],  // ← tambah koma
   "-": ["00000","00000","11111","00000","00000"],
   "/": ["00001","00010","00100","01000","10000"],
+  "!": ["00100","00100","00100","00000","00100"],
+  "'": ["00110","00110","00000","00000","00000"],
   "A": ["01110","10001","11111","10001","10001"],
   "B": ["11110","10001","11110","10001","11110"],
   "C": ["01111","10000","10000","10000","01111"],
@@ -56,12 +59,17 @@ const FONT: Record<string, string[]> = {
   "9": ["01110","10001","01111","00001","01110"],
 };
 
-const ROWS     = 5;
-const COLS     = 5;
-const DS       = 3;          // dot diameter px
-const DG       = 1;          // dot gap px
-const STEP     = DS + DG;    // 4px per slot
-const COL_GAP  = 2;          // blank dot-cols between chars
+const ROWS    = 5;
+const COLS    = 5;
+const DS      = 3;       // dot diameter px
+const DG      = 1;       // dot gap px
+const STEP    = DS + DG; // 4px per slot
+const COL_GAP = 2;       // blank dot-cols between chars
+
+// Speed: piksel per frame. 60fps → 60 * speed piksel/detik
+// 0.5 ≈ 30px/s (santai), 1.5 ≈ 90px/s (cepat), 1.0 ≈ 60px/s (default)
+const SPEED_NORMAL = 1.0;
+const SPEED_AUTO   = 1.5;
 
 function buildStrip(text: string): boolean[][] {
   const strip: boolean[][] = [];
@@ -87,7 +95,8 @@ export const Libraries: React.FC<LibrariesProps> = ({ className }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const wrapRef   = useRef<HTMLDivElement>(null);
   const rafRef    = useRef<number>(0);
-  const offsetRef = useRef(0);
+  // Pakai float piksel agar sub-pixel smooth, bukan kolom diskret
+  const offsetPxRef = useRef(0);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -96,22 +105,23 @@ export const Libraries: React.FC<LibrariesProps> = ({ className }) => {
 
     const ctx = canvas.getContext("2d")!;
 
-    const fullText = MARQUEE_ITEMS.join(SEPARATOR) + SEPARATOR;
-    const strip    = buildStrip(fullText);
-    const TOTAL    = strip.length;
+    const fullText  = MARQUEE_ITEMS.join(SEPARATOR) + SEPARATOR;
+    const strip     = buildStrip(fullText);
+    const TOTAL_PX  = strip.length * STEP; // lebar total strip dalam piksel
 
-    const speed = spojtConfig.utilities.autoScroll ? 0.07 : 0.04;
+    const speed = spojtConfig.utilities.autoScroll ? SPEED_AUTO : SPEED_NORMAL;
 
     canvas.height = ROWS * STEP;
 
-    // Baca CSS variable dari root untuk warna on/off — ikut theme Once UI
     const getColors = () => {
       const style = getComputedStyle(document.documentElement);
-      const onColor  = style.getPropertyValue("--neutral-on-background-strong").trim()
-        || style.getPropertyValue("--text-primary").trim()
-        || "rgba(230,230,228,1)";
-      const offColor = style.getPropertyValue("--neutral-alpha-weak").trim()
-        || "rgba(255,255,255,0.10)";
+      const onColor  =
+        style.getPropertyValue("--neutral-on-background-strong").trim() ||
+        style.getPropertyValue("--text-primary").trim() ||
+        "rgba(230,230,228,1)";
+      const offColor =
+        style.getPropertyValue("--neutral-alpha-weak").trim() ||
+        "rgba(255,255,255,0.10)";
       return { onColor, offColor };
     };
 
@@ -123,20 +133,22 @@ export const Libraries: React.FC<LibrariesProps> = ({ className }) => {
       const visibleCols = Math.ceil(W / STEP) + 1;
 
       for (let d = 0; d < visibleCols; d++) {
-        const si  = Math.floor(offsetRef.current + d) % TOTAL;
+        // posisi piksel titik ke-d di layar
+        const xScreen = d * STEP - (offsetPxRef.current % STEP);
+        // kolom strip mana yang tampil di slot ini
+        const si = (Math.floor(offsetPxRef.current / STEP) + d) % strip.length;
         const col = strip[si];
-        const x   = d * STEP;
 
         for (let r = 0; r < ROWS; r++) {
           ctx.fillStyle = col[r] ? onColor : offColor;
           ctx.beginPath();
-          ctx.arc(x + DS / 2, r * STEP + DS / 2, DS / 2, 0, Math.PI * 2);
+          ctx.arc(xScreen + DS / 2, r * STEP + DS / 2, DS / 2, 0, Math.PI * 2);
           ctx.fill();
         }
       }
 
-      offsetRef.current += speed;
-      if (offsetRef.current >= TOTAL) offsetRef.current -= TOTAL;
+      offsetPxRef.current += speed;
+      if (offsetPxRef.current >= TOTAL_PX) offsetPxRef.current -= TOTAL_PX;
       rafRef.current = requestAnimationFrame(draw);
     };
 
@@ -165,7 +177,7 @@ export const Libraries: React.FC<LibrariesProps> = ({ className }) => {
     >
       <Flex center maxWidth={8} id="librariesTextLeft">
         <Text variant="label-default-xs" onBackground="neutral-weak">
-          Built using awesome libraries and stacks:
+          Never miss a JKT48 update:
         </Text>
       </Flex>
 
@@ -173,7 +185,7 @@ export const Libraries: React.FC<LibrariesProps> = ({ className }) => {
         ref={wrapRef}
         style={{ position: "relative", flex: 1, overflow: "hidden" }}
       >
-        {/* fade edges — pakai Fade dari Once UI supaya ikut theme */}
+        {/* fade edges */}
         <Fade
           zIndex="1"
           to="right"
