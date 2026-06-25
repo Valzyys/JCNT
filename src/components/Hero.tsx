@@ -86,10 +86,10 @@ export const Hero: React.FC<HeroProps> = ({ className }) => {
           style={{ fontFamily: "var(--font-questrial)" }}
           id="heroTextLeft"
         >
-          The <span>new</span> Atomic UI
+          Never <span>Miss</span> a JKT48
           <span style={{ fontFamily: fonts.bitcount.style.fontFamily }}>
             {" "}
-            Registry
+            Update
           </span>
           .
         </Text>
