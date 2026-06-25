@@ -11,12 +11,11 @@ const MARQUEE_ITEMS = [
 const SEPARATOR = "   ·   ";
 // ────────────────────────────────────────────────────────────────────────────
 
-// 5×5 dot-matrix font — jauh lebih readable dari 5×3
 const FONT: Record<string, string[]> = {
   " ": ["00000","00000","00000","00000","00000"],
   "·": ["00000","00000","00110","00110","00000"],
   ".": ["00000","00000","00000","00110","00110"],
-  ",": ["00000","00000","00000","00110","00100"],  // ← tambah koma
+  ",": ["00000","00000","00000","00110","00100"],
   "-": ["00000","00000","11111","00000","00000"],
   "/": ["00001","00010","00100","01000","10000"],
   "!": ["00100","00100","00100","00000","00100"],
@@ -66,10 +65,8 @@ const DG      = 1;       // dot gap px
 const STEP    = DS + DG; // 4px per slot
 const COL_GAP = 2;       // blank dot-cols between chars
 
-// Speed: piksel per frame. 60fps → 60 * speed piksel/detik
-// 0.5 ≈ 30px/s (santai), 1.5 ≈ 90px/s (cepat), 1.0 ≈ 60px/s (default)
-const SPEED_NORMAL = 1.0;
-const SPEED_AUTO   = 1.5;
+const SPEED_NORMAL = 0.6;  // px per frame
+const SPEED_AUTO   = 1.0;
 
 function buildStrip(text: string): boolean[][] {
   const strip: boolean[][] = [];
@@ -92,10 +89,9 @@ interface LibrariesProps {
 }
 
 export const Libraries: React.FC<LibrariesProps> = ({ className }) => {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const wrapRef   = useRef<HTMLDivElement>(null);
-  const rafRef    = useRef<number>(0);
-  // Pakai float piksel agar sub-pixel smooth, bukan kolom diskret
+  const canvasRef   = useRef<HTMLCanvasElement>(null);
+  const wrapRef     = useRef<HTMLDivElement>(null);
+  const rafRef      = useRef<number>(0);
   const offsetPxRef = useRef(0);
 
   useEffect(() => {
@@ -105,9 +101,9 @@ export const Libraries: React.FC<LibrariesProps> = ({ className }) => {
 
     const ctx = canvas.getContext("2d")!;
 
-    const fullText  = MARQUEE_ITEMS.join(SEPARATOR) + SEPARATOR;
-    const strip     = buildStrip(fullText);
-    const TOTAL_PX  = strip.length * STEP; // lebar total strip dalam piksel
+    const fullText = MARQUEE_ITEMS.join(SEPARATOR) + SEPARATOR;
+    const strip    = buildStrip(fullText);
+    const TOTAL_PX = strip.length * STEP;
 
     const speed = spojtConfig.utilities.autoScroll ? SPEED_AUTO : SPEED_NORMAL;
 
@@ -117,11 +113,10 @@ export const Libraries: React.FC<LibrariesProps> = ({ className }) => {
       const style = getComputedStyle(document.documentElement);
       const onColor  =
         style.getPropertyValue("--neutral-on-background-strong").trim() ||
-        style.getPropertyValue("--text-primary").trim() ||
         "rgba(230,230,228,1)";
       const offColor =
         style.getPropertyValue("--neutral-alpha-weak").trim() ||
-        "rgba(255,255,255,0.10)";
+        "rgba(255,255,255,0.08)";
       return { onColor, offColor };
     };
 
@@ -130,19 +125,34 @@ export const Libraries: React.FC<LibrariesProps> = ({ className }) => {
       ctx.clearRect(0, 0, W, canvas.height);
 
       const { onColor, offColor } = getColors();
-      const visibleCols = Math.ceil(W / STEP) + 1;
 
-      for (let d = 0; d < visibleCols; d++) {
-        // posisi piksel titik ke-d di layar
-        const xScreen = d * STEP - (offsetPxRef.current % STEP);
-        // kolom strip mana yang tampil di slot ini
-        const si = (Math.floor(offsetPxRef.current / STEP) + d) % strip.length;
-        const col = strip[si];
+      // Berapa banyak kolom dot yang muat di canvas (grid tetap/statis)
+      const totalGridCols = Math.ceil(W / STEP) + 1;
+
+      // Offset dalam unit "kolom strip" (float)
+      const offsetCols = offsetPxRef.current / STEP;
+      const colBase    = Math.floor(offsetCols);
+      const subPx      = (offsetCols - colBase) * STEP; // sisa sub-kolom dalam px
+
+      for (let d = 0; d < totalGridCols; d++) {
+        // Posisi X dot ini di canvas — titik TIDAK bergerak, selalu snap ke grid
+        const xFixed = d * STEP;
+
+        // Kolom strip mana yang "diprojeksikan" ke posisi grid ini
+        const si  = (colBase + d) % strip.length;
+        const si2 = (colBase + d + 1) % strip.length;
+
+        // Interp: saat subPx > 0 kita blend antara si dan si+1
+        // supaya transisi antar karakter tidak patah
+        const col  = strip[si];
+        const col2 = strip[si2];
 
         for (let r = 0; r < ROWS; r++) {
-          ctx.fillStyle = col[r] ? onColor : offColor;
+          // Pilih kolom berdasarkan sub-pixel offset
+          const lit = subPx < STEP / 2 ? col[r] : col2[r];
+          ctx.fillStyle = lit ? onColor : offColor;
           ctx.beginPath();
-          ctx.arc(xScreen + DS / 2, r * STEP + DS / 2, DS / 2, 0, Math.PI * 2);
+          ctx.arc(xFixed + DS / 2, r * STEP + DS / 2, DS / 2, 0, Math.PI * 2);
           ctx.fill();
         }
       }
@@ -185,7 +195,6 @@ export const Libraries: React.FC<LibrariesProps> = ({ className }) => {
         ref={wrapRef}
         style={{ position: "relative", flex: 1, overflow: "hidden" }}
       >
-        {/* fade edges */}
         <Fade
           zIndex="1"
           to="right"
