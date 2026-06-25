@@ -86,7 +86,7 @@ export const Hero: React.FC<HeroProps> = ({ className }) => {
           style={{ fontFamily: "var(--font-questrial)" }}
           id="heroTextLeft"
         >
-          Never <span>Miss</span> a
+          Never <span>Miss</span> JKT48
           <span style={{ fontFamily: fonts.bitcount.style.fontFamily }}>
             {" "}
             Update
