@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useRef } from "react";
-import { Flex, Text } from "@once-ui-system/core";
+import { Flex, Text, Fade } from "@once-ui-system/core";
 import { spojtConfig } from "@/resources/spojt.config";
 
 // ── EDIT TEKS DI SINI ───────────────────────────────────────────────────────
