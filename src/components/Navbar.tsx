@@ -53,7 +53,7 @@ export const Navbar: React.FC<NavbarProps> = ({ className }) => {
           />
           <Text variant="heading-default-xl" onBackground="neutral-strong">
             <span style={{ fontFamily: fonts.bitcount.style.fontFamily }}>
-              Spojt
+              JKT48Connect
             </span>
           </Text>
         </Row>
